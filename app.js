@@ -1,37 +1,45 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-
+const path = require('path');
 const app = express();
-const port = 3000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(bodyParser.json());
+// Body & statische Dateien
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// In-Memory ToDo Liste (nur für Test)
+// einfache In‑Memory Daten (später ersetzen wir das durch DB)
 let todos = [];
+let nextId = 1;
 
-// Startseite
-app.get('/', (req, res) => {
-  res.send('Willkommen zur ToDo-App API! Endpunkte: GET /todos, POST /todos');
+// UI
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// Alle Todos anzeigen
-app.get('/todos', (req, res) => {
-  res.json(todos);
+// API
+app.get('/api/todos', (_req, res) => res.json(todos));
+
+app.post('/api/todos', (req, res) => {
+  const title = (req.body?.title || '').trim();
+  if (!title) return res.status(400).json({error:'Titel fehlt'});
+  const todo = { id: nextId++, title, done: false };
+  todos.unshift(todo);
+  res.status(201).json(todo);
 });
 
-// Neues Todo hinzufügen
-app.post('/todos', (req, res) => {
-  const { title } = req.body;
-  if (!title) {
-    return res.status(400).json({ error: 'Titel ist erforderlich' });
-  }
-  const newTodo = { id: todos.length + 1, title };
-  todos.push(newTodo);
-  res.status(201).json(newTodo);
+app.post('/api/todos/:id/done', (req, res) => {
+  const id = Number(req.params.id);
+  const t = todos.find(x => x.id === id);
+  if (!t) return res.sendStatus(404);
+  t.done = true;
+  res.sendStatus(204);
 });
 
-// Server starten
-app.listen(port, () => {
-  console.log(`✅ Server läuft unter http://localhost:${port}`);
+app.delete('/api/todos/:id', (req, res) => {
+  const id = Number(req.params.id);
+  todos = todos.filter(x => x.id !== id);
+  res.sendStatus(204);
 });
+
+app.listen(PORT, () => console.log(`✅ Server läuft auf http://localhost:${PORT}`));
+
